@@ -3,6 +3,10 @@ from datetime import date
 def extract_login_domain(address: str) -> tuple[str, str]:
     return address.split("@")[0], address.split("@")[1]
 
+def clean_body_text(body: str) -> str:
+    if not body:
+        return ""
+    return " ".join(body.split())
 
 def mask_sender_email(login: str, domain: str) -> str:
     return login[:2] + "***@" + domain
@@ -28,7 +32,7 @@ def add_short_body(body: str) -> str:
 
 def build_sent_text(email: dict) -> str:
     return (
-        f"Кому: {email['recipient']}, от {email['sender']}\n"
+        f"Кому: {email['masked_recipient']}, от {email['masked_sender']}\n"
         f"Тема: {email['subject']}, дата {email['date']}\n"
         f"{email['short_body']}"
     )
@@ -48,13 +52,15 @@ def get_correct_email(email_list: list[str]) -> list[str]:
     for email in email_list:
         cleaned = email.strip().lower()
 
-        if "@" not in cleaned:
-            continue
-        if not cleaned.endswith((".com", ".ru", ".net")):
+        if cleaned.count("@") != 1:
             continue
 
-        login = cleaned.split("@")[0]
-        if len(login) == 0:
+        login, domain = cleaned.split("@")
+
+        if not login or not domain:
+            continue
+
+        if not domain.endswith((".com", ".ru", ".net")):
             continue
 
         result.append(cleaned)
@@ -82,17 +88,28 @@ def sender_email(
     if is_empty_subject or is_empty_body:
         return []
 
+    cleaned_subject = clean_body_text(subject)
+    cleaned_body = clean_body_text(message)
+
     login, domain = extract_login_domain(sender)
     masked_sender = mask_sender_email(login, domain)
 
     result = []
 
     for recipient in recipients:
-        email = create_email(sender, recipient, subject.strip(), message)
+        login_r, domain_r = extract_login_domain(recipient)
+        masked_recipient = mask_sender_email(login_r, domain_r)
+        email = create_email(
+            masked_sender,
+            recipient,
+            cleaned_subject,
+            cleaned_body
+        )
 
         email = add_send_date(email)
 
         email["masked_sender"] = masked_sender
+        email["masked_recipient"] = masked_recipient
         email["short_body"] = add_short_body(email["body"])
         email["sent_text"] = build_sent_text(email)
 
