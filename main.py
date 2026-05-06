@@ -60,7 +60,15 @@ def get_correct_email(email_list: list[str]) -> list[str]:
         if not login or not domain:
             continue
 
-        if not domain.endswith((".com", ".ru", ".net")):
+        if "." not in domain:
+            continue
+
+        name, zone = domain.rsplit(".", 1)
+
+        if not name or not zone:
+            continue
+
+        if zone not in ("com", "ru", "net"):
             continue
 
         result.append(cleaned)
